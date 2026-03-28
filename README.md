@@ -12,6 +12,12 @@ Pipeline: **fetch Jira JSON → embed with Ollama → MariaDB → search / expor
 
 ---
 
+## Screenshot of Web UI 
+
+![MariaDB Jira RAG — Streamlit search UI](screenshot.png)
+
+---
+
 ## On MacBook
 
 If you use [Homebrew](https://brew.sh), install MariaDB and Ollama (skip any you already have):

@@ -5,7 +5,7 @@ This project pulls **MDEV** issues from [MariaDB Jira](https://jira.mariadb.org)
 **What you can do**
 
 - **Fetch** issues from the public Jira REST API into `data/issues/MDEV-*.json` (incremental: newest first, then backfill older keys). Each file stores a **subset of Jira fields** (see `FIELDS` in `fetch_jira.py`—summary, description, status, resolution, issue type, priority, components, fix versions, dates, comments, etc.).
-- **Load** JSON into MariaDB: one row per issue plus one **`issue`** embedding chunk. Embeddings use **summary + description + comment bodies** present in that JSON (cleaned, length-capped; see `load_mariadb.py`). Re-fetch JSON after changing `FIELDS` so new keys (e.g. `issuetype`) appear on disk.
+- **Load** JSON into MariaDB: one row per issue plus one **`issue`** embedding chunk. What is embedded is spelled out under [Loading MariaDB](#loading-mariadb) (summary + description + comments, cleaned, then **up to the first 8000 characters** of that cleaned text for the vector). Re-fetch JSON after changing `FIELDS` so new keys (e.g. `issuetype`) appear on disk.
 - **Search** in the browser: natural-language query, filters (status, resolution, type, priority, component), vector distance ranking, links to Jira, collapsible SQL, and a download button (**Download search results with prompt for RAG in e.g. Claude Chat**) that saves JSON with **`task_for_claude`**, your query, filters, and full issue JSON per hit.
 
 Pipeline: **fetch Jira JSON → embed with Ollama → MariaDB → search / export in the Web UI.**
@@ -73,7 +73,26 @@ python fetch_jira.py status
 
 ## Loading MariaDB
 
-Reads `data/issues/MDEV-*.json`, cleans text (strips Jira `{code}` / `{noformat}` / `{quote}` blocks, stack traces, long hex, etc.), calls Ollama, and upserts into `jirarag`. Embedding tries character limits **8000 → 4000 → 2000** after cleaning if a call fails; the run summary reports how many issues used a shorter fallback.
+### What gets embedded (for the vector)
+
+The model sees **one string per issue**, built in this order from the JSON on disk:
+
+1. **Summary** (title)  
+2. **Description**  
+3. **Comment bodies** — each `fields.comment.comments[].body`, in order (only comments **included in that file**; Jira may paginate)
+
+Then **`clean_for_embedding()`** in `load_mariadb.py` normalizes that combined text:
+
+- Removes Jira **`{code}…{code}`**, **`{noformat}…{noformat}`**, and **`{quote}…{quote}`** blocks (so large code / log dumps are dropped for embedding)  
+- Collapses Java-style **stack trace** lines  
+- Replaces long **hex** runs with a placeholder  
+- Collapses **whitespace** to single spaces  
+
+The embedding call uses **the first 8000 characters** of that **cleaned** string (so anything after 8k is not in the vector). If Ollama fails on that length, the loader retries with **4000**, then **2000** characters; the run summary says how many issues needed a shorter fallback.
+
+The **`chunks.content`** column still stores the **raw** combined text (before clean/truncate) for reference; only the **vector** is derived from cleaned + truncated text.
+
+Otherwise: the loader reads `data/issues/MDEV-*.json`, embeds as above, and upserts rows into `jirarag`.
 
 | Command | Description |
 |--------|-------------|
@@ -89,7 +108,7 @@ python load_mariadb.py
 python load_mariadb.py --rebuild
 ```
 
-**Comments in Jira JSON** may be paginated (`fields.comment.total` vs length of `comments`); only what the API returned in that file is embedded.
+**Comments in Jira JSON** may be paginated (`fields.comment.total` vs length of `comments`); only what the API returned in that file is included in the combined text above.
 
 ---
 

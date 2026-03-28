@@ -15,7 +15,7 @@ import json
 import mariadb
 import ollama
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import streamlit as st
@@ -50,6 +50,8 @@ Your job:
 @st.cache_resource
 def get_connection():
     conn = mariadb.connect(**DB_CONFIG)
+    # Default autocommit=False can pin a repeatable-read snapshot; loader commits stay invisible.
+    conn.autocommit = True
     ensure_priority_column(conn)
     return conn
 
@@ -296,11 +298,18 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-st.title("🔍 MariaDB Jira RAG")
-st.caption(
-    f"Semantic search over {get_issue_count()} MDEV issues · "
-    f"Powered by MariaDB VECTOR + Ollama"
-)
+
+@st.fragment(run_every=timedelta(seconds=10))
+def header_with_live_issue_count():
+    """Re-runs periodically so the issue count updates while load_mariadb adds rows."""
+    st.title("🔍 MariaDB Jira RAG")
+    st.caption(
+        f"Semantic search over {get_issue_count()} MDEV issues · "
+        f"Powered by MariaDB VECTOR + Ollama"
+    )
+
+
+header_with_live_issue_count()
 
 query = st.text_area(
     "Describe what you're looking for",

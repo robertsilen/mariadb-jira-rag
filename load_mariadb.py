@@ -30,7 +30,7 @@ DATA_DIR = Path("data/issues")
 
 DB_CONFIG = {
     "unix_socket": "/tmp/mysql.sock",
-    "user": "robertsilen",
+    "user": "username",
     "password": "",
     "database": "jirarag",
 }

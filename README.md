@@ -2,9 +2,10 @@
 
 In a locally run web UI, do vector search on 36 000 MDEV MariaDB Jira issues fetched from [jira.mariadb.org](https://jira.mariadb.org). 
 
-**What happens**
+**What happens in each step**
+- Prepare: install mariadb, ollama, streamlit
 1. Python script fetches all MDEV issues from [jira.mariadb.org](https://jira.mariadb.org) and stores them locally as indivudal JSON files. 
-2. Pyhton script loads issues into a **MariaDB** database as vector and metadata. Summary+description+comments (up to 8000 chars) are vectorized to embeddings locally with **Ollama** (`nomic-embed-text`). 36 000 issues take about half a minute with MacBook M4 processor.
+2. Pyhton script loads issues into a **MariaDB** database as text and vector with metadata. Vectorizing issues to embeddings containing summary+description+comments (up to 8000 chars) is done locally with **Ollama** (`nomic-embed-text`). It takes about about half a minute with a MacBook M4 processor to embed 36 000 issues.
 3. In a Web UI (StreamLit) user can search with a word or phrase for semanticaly similar issues. The vector search can also be combined SQL options (issue type, components, etc). Search results can be downloaded as JSON file with prompt, so it can be uploaded to AI chat till claude.ai for dialog and anlysis. Alternatively the chat feature could be implemented in the actual Streamlit web UI. 
 
 ---

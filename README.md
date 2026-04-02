@@ -1,50 +1,53 @@
 # MariaDB Jira RAG
 
-This project pulls **MDEV** issues from [MariaDB Jira](https://jira.mariadb.org), stores them as JSON on disk, **embeds** text locally with **Ollama** (`nomic-embed-text`), and writes vectors into a **MariaDB** database that supports **vector similarity search**. A **Streamlit** app runs semantic search with filters and optional **export** of results for tools like Claude Chat.
+In a locally run web UI, do semantic, vector search over Jira over 36 000 MDEV issues issues fetched from [jira.mariadb.org](https://jira.mariadb.org). 
 
-**What you can do**
-
-- **Fetch** issues from the public Jira REST API into `data/issues/MDEV-*.json` (incremental: newest first, then backfill older keys). Each file stores a **subset of Jira fields** (see `FIELDS` in `fetch_jira.py`—summary, description, status, resolution, issue type, priority, components, fix versions, dates, comments, etc.).
-- **Load** JSON into MariaDB: one row per issue plus one **`issue`** embedding chunk. What is embedded is spelled out under [Loading MariaDB](#loading-mariadb) (summary + description + comments, cleaned, then **up to the first 8000 characters** of that cleaned text for the vector). Re-fetch JSON after changing `FIELDS` so new keys (e.g. `issuetype`) appear on disk.
-- **Search** in the browser: natural-language query, filters (status, resolution, type, priority, component), vector distance ranking, links to Jira, collapsible SQL, and a download button (**Download search results with prompt for RAG in e.g. Claude Chat**) that saves JSON with **`task_for_claude`**, your query, filters, and full issue JSON per hit.
-
-Pipeline: **fetch Jira JSON → embed with Ollama → MariaDB → search / export in the Web UI.**
+**What happens**
+1. Python script fetches all MDEV issues from [jira.mariadb.org](https://jira.mariadb.org) and stores them locally as indivudal JSON files. 
+2. Pyhton script loads issues into a **MariaDB** database as vector and metadata. Summary+description+comments (up to 8000 chars) are vectorized to embeddings locally with **Ollama** (`nomic-embed-text`). 36 000 issues take about half a minute with MacBook M4 processor.
+3. In a Web UI (StreamLit) user can search with a word or phrase for semanticaly similar issues. The vector search can also be combined SQL options (issue type, components, etc). Search results can be downloaded as JSON file with prompt, so it can be uploaded to AI chat till claude.ai for dialog and anlysis. Alternatively the chat feature could be implemented in the actual Streamlit web UI. 
 
 ---
 
-## Screenshot of Web UI 
+## Screenshot of Web UI with search results.
 
 ![MariaDB Jira RAG — Streamlit search UI](screenshot.png)
 
 ---
 
-## On MacBook
-
-If you use [Homebrew](https://brew.sh), install MariaDB and Ollama (skip any you already have):
+## How to run on MacBook
 
 ```bash
+# If you use [Homebrew](https://brew.sh), install MariaDB and Ollama (skip any you already have):
+
 brew install mariadb ollama
-```
 
-Start MariaDB and create the database (adjust user/password to match your setup):
+# Start MariaDB and create the database (adjust user/password to match your setup):
 
-```bash
 brew services start mariadb
 mariadb -u root -e "CREATE DATABASE IF NOT EXISTS jirarag;"
-```
 
-Pull the embedding model and install Python dependencies:
+# Pull the Ollama embedding model and install Python dependencies:
 
-```bash
 ollama pull nomic-embed-text
 pip install streamlit mariadb ollama requests
 ```
 
-Ensure **Ollama is running** (e.g. the default `ollama serve` / menu app) whenever you load data or use the search UI.
+Then run these three steps (for more parameters se below)
 
-**Database connection:** `fetch_jira.py` only needs the filesystem. `load_mariadb.py` and `search_app.py` use `DB_CONFIG` at the top of each file (Unix socket, user, password, database `jirarag`). Point these at your MariaDB user and socket path—by default they match a typical Homebrew MariaDB layout on macOS (`/tmp/mysql.sock`).
+```bash
+# 1. **Fetch Jira issues**
 
-**`--rebuild` and open connections:** Stop **Streamlit** (and other clients using `jirarag`) before `python load_mariadb.py --rebuild`, or `DROP TABLE` can block on locks.
+python fetch_jira.py newest 40000
+
+# 2. **Load into MariaDB**
+
+python load_mariadb.py
+
+# 3. **Run RAG-webUI, usually at http://localhost:8501**
+
+streamlit run search_app.py
+```
 
 ---
 
@@ -121,14 +124,6 @@ streamlit run search_app.py
 ```
 
 Open the URL Streamlit prints (usually `http://localhost:8501`). Enter a query, set filters, click **Search**. After results, use **Download search results with prompt for RAG in e.g. Claude Chat** to save JSON (includes `task_for_claude`, `user_query`, `filters_at_export`, and `search_hits` with full per-issue JSON from `data/issues/`). Run Streamlit from the repo root so those paths resolve.
-
----
-
-## Extra script
-
-| Command | Description |
-|--------|-------------|
-| `python count_issue_text.py [threshold]` | For each `MDEV-*.json`, count **cleaned** characters for summary + description + comment bodies; report how many exceed `threshold` (default **4000**). |
 
 ---
 

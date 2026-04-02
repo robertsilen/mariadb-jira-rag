@@ -1,6 +1,6 @@
 # MariaDB Jira RAG
 
-In a locally run web UI, do semantic, vector search over Jira over 36 000 MDEV issues issues fetched from [jira.mariadb.org](https://jira.mariadb.org). 
+In a locally run web UI, do vector search on 36 000 MDEV MariaDB Jira issues fetched from [jira.mariadb.org](https://jira.mariadb.org). 
 
 **What happens**
 1. Python script fetches all MDEV issues from [jira.mariadb.org](https://jira.mariadb.org) and stores them locally as indivudal JSON files. 

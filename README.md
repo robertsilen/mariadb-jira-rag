@@ -28,9 +28,10 @@ brew install mariadb ollama
 brew services start mariadb
 mariadb -u root -e "CREATE DATABASE IF NOT EXISTS jirarag;"
 
-# Pull the Ollama embedding model and install Python dependencies:
+# Pull the Ollama embedding model, start Ollama service, and install Python dependencies:
 
 ollama pull nomic-embed-text
+ollama serve
 pip install streamlit mariadb ollama requests
 ```
 

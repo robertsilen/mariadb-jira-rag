@@ -58,10 +58,16 @@ def get_connection():
 
 def embed_query(text):
     """Embed a user query for search."""
-    response = ollama.embed(
-        model=EMBED_MODEL,
-        input=f"search_query: {text}",
-    )
+    try:
+        response = ollama.embed(
+            model=EMBED_MODEL,
+            input=f"search_query: {text}",
+        )
+    except Exception as exc:
+        raise RuntimeError(
+            "Could not connect to Ollama. Start Ollama and ensure model "
+            f"'{EMBED_MODEL}' is available."
+        ) from exc
     return response["embeddings"][0]
 
 
@@ -341,16 +347,21 @@ with f_search:
 
 # Results
 if search_clicked and query.strip():
-    with st.spinner("Embedding query and searching..."):
-        results, display_sql = search(
-            query,
-            status_filter,
-            resolution_filter,
-            component_filter,
-            issue_type_filter,
-            priority_filter,
-            limit,
-        )
+    try:
+        with st.spinner("Embedding query and searching..."):
+            results, display_sql = search(
+                query,
+                status_filter,
+                resolution_filter,
+                component_filter,
+                issue_type_filter,
+                priority_filter,
+                limit,
+            )
+    except RuntimeError as exc:
+        st.error(str(exc))
+        st.info("Tip: run `ollama serve` and `ollama pull nomic-embed-text`.")
+        st.stop()
 
     if not results:
         _sql_expander(display_sql)
